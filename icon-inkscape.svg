@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="512"
+   height="512"
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   sodipodi:docname="icon-inkscape.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="px"
+     showgrid="false"
+     inkscape:zoom="1.2578125"
+     inkscape:cx="124.02484"
+     inkscape:cy="255.60248"
+     inkscape:window-width="1920"
+     inkscape:window-height="1181"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:600;font-stretch:normal;font-size:53.3333px;line-height:1.25;font-family:'Source Code Pro';-inkscape-font-specification:'Source Code Pro Semi-Bold';fill:#ff9a00;fill-opacity:1"
+       x="19.431677"
+       y="65.397514"
+       id="text7117"><tspan
+         sodipodi:role="line"
+         x="19.431677"
+         y="65.397514"
+         id="tspan10155" /></text>
+    <text
+       xml:space="preserve"
+       style="font-weight:900;font-size:64px;line-height:1.25;font-family:'Source Code Pro';-inkscape-font-specification:'Source Code Pro Heavy'"
+       x="18.624224"
+       y="57.857143"
+       id="text20670"><tspan
+         sodipodi:role="line"
+         id="tspan20668"
+         x="18.624224"
+         y="57.857143"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1">lora 04</tspan><tspan
+         sodipodi:role="line"
+         x="18.624224"
+         y="137.85715"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1"
+         id="tspan30918">drop 05</tspan><tspan
+         sodipodi:role="line"
+         x="18.624224"
+         y="217.85715"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1"
+         id="tspan40694">ok   06</tspan><tspan
+         sodipodi:role="line"
+         x="18.624224"
+         y="297.85715"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1"
+         id="tspan40696">lora 07</tspan><tspan
+         sodipodi:role="line"
+         x="18.624224"
+         y="377.85715"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1"
+         id="tspan40698">ok   08</tspan><tspan
+         sodipodi:role="line"
+         x="18.624224"
+         y="457.85715"
+         style="font-size:64px;fill:#fb5510;fill-opacity:1"
+         id="tspan40700">ok   09</tspan></text>
+    <circle
+       style="fill:none;fill-opacity:1;stroke:#1ff946;stroke-width:8.23644;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path44472"
+       cx="398.29681"
+       cy="386.39926"
+       r="105.85228" />
+    <circle
+       style="fill:none;fill-opacity:1;stroke:#1ff946;stroke-width:6.59627;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path44472-3"
+       cx="403.7562"
+       cy="380.79657"
+       r="84.7733" />
+    <circle
+       style="fill:none;fill-opacity:1;stroke:#1ff946;stroke-width:5.16846;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path44472-3-6"
+       cx="405.30591"
+       cy="375.56677"
+       r="66.423538" />
+    <circle
+       style="fill:none;fill-opacity:1;stroke:#1ff946;stroke-width:9.68321;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path44472-3-7"
+       cx="396.573"
+       cy="389.07919"
+       r="124.44567" />
+    <circle
+       style="fill:none;fill-opacity:1;stroke:#1ff946;stroke-width:11.3281;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path44472-3-5"
+       cx="394.67856"
+       cy="390.35248"
+       r="145.58594" />
+  </g>
+</svg>

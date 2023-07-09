@@ -12,6 +12,7 @@ import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -35,11 +36,19 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationRequest.Builder;
+
+import com.google.android.gms.location.LocationServices;
 import com.hoho.android.usbserial.driver.SerialTimeoutException;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
@@ -79,6 +88,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private BufferedOutputStream logFile;
     private StringBuffer logAccum;
 
+    private LocationCallback locationCallback;
+    private Location currLocation;
+
     private static final int PICK_LOG_PATH = 111;
 
     public TerminalFragment() {
@@ -106,6 +118,20 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         deviceId = getArguments().getInt("device");
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
+
+        requestLocPerms();
+
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                currLocation = locationResult.getLastLocation();
+                Log.v("xxx", "loc accuracy " + String.valueOf(currLocation.getAccuracy()));
+            }
+        };
+
     }
 
     @Override
@@ -155,6 +181,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         if(controlLinesEnabled && controlLines != null && connected == Connected.True)
             controlLines.start();
+
+        final int LOC_MILLIS = 5000;
+        LocationRequest lr = new LocationRequest.Builder(LocationRequest.PRIORITY_HIGH_ACCURACY, LOC_MILLIS)
+        // .setWaitForAccurateLocation(true)
+        .build();
+        // TODO check permission
+        LocationServices.getFusedLocationProviderClient(getActivity()).
+            requestLocationUpdates(lr,
+                locationCallback,
+                Looper.getMainLooper());
+
     }
 
     @Override
@@ -279,6 +316,25 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
     }
 
+    void requestLocPerms() {
+        ActivityResultLauncher<String[]> locationPermissionRequest =
+            registerForActivityResult(new ActivityResultContracts
+                .RequestMultiplePermissions(), result -> {
+                // TODO look at the result
+                }
+            );
+
+            // ...
+
+            // Before you perform the actual permission request, check whether your app
+            // already has the permissions, and whether your app needs to show a permission
+            // rationale dialog. For more details, see Request permissions.
+            locationPermissionRequest.launch(new String[] {
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION",
+            });
+    }
+
     @Override
     public void onActivityResult(int requestCode, int resultCode,
         Intent resultData) {
@@ -327,14 +383,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     df.getUri(), "wa");
                 logFile = new BufferedOutputStream(f, 8192);
             } catch (Exception e) {
-                status("Failed opening " + df + ": " + e);
+                status("Failed opening " + df.getName() + ": " + e);
             }
             try {
-                logFile.write("time,lat,long,term\n".getBytes());
+                logFile.write("time,lat,long,radius,term\n".getBytes());
             } catch (Exception e) {
                 // shrug
             }
-            status("New log " + df);
+            status("New log " + df.getName());
         }
     }
 
@@ -346,7 +402,18 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         String now = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZZ").format(new Date());
         String lat = "";
         String lon = "";;
-        String r = String.format("%s,%s,%s,\"%s\"\n", now, lat, lon, csvEscape(line));
+        String radius = "";;
+        final int GPS_LIVE_SECS = 20 * 1000;
+        if (currLocation != null) {
+            long del = Math.abs(currLocation.getTime() - new Date().getTime());
+            Log.v("xxx", "del " + String.valueOf(del) + " gps " + String.valueOf(currLocation.getTime()));
+            if (del < GPS_LIVE_SECS) {
+                lat = String.valueOf(currLocation.getLatitude());
+                lon = String.valueOf(currLocation.getLongitude());
+                radius = String.valueOf(currLocation.getAccuracy());
+            }
+        }
+        String r = String.format("%s,%s,%s,%s,\"%s\"\n", now, lat, lon, radius, csvEscape(line));
         try {
             logFile.write(r.getBytes());
         } catch (Exception e) {
@@ -357,7 +424,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void log(String msg) {
         String[] parts = msg.split("\n");
         for (int i = 0; i < parts.length - 1; i++) {
-            Log.v("eh", String.valueOf(i) + parts[i]);
             if (i == 0) {
                 logLine(logAccum.toString());
                 logAccum = new StringBuffer();
