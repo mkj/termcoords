@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package termcoords;
 
 import com.hoho.android.usbserial.driver.FtdiSerialDriver;
 import com.hoho.android.usbserial.driver.ProbeTable;

@@ -25,15 +25,15 @@
             android:id="@+id/controlLineCts"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="48sp"
             android:clickable="false"
+            android:minWidth="48sp"
             android:textColor="@android:color/secondary_text_dark"
             android:textOff="CTS"
             android:textOn="CTS" />
 
         <View
-            android:layout_height="match_parent"
-            android:layout_width="6dp" />
+            android:layout_width="6dp"
+            android:layout_height="match_parent" />
 
         <ToggleButton
             android:id="@+id/controlLineDtr"
@@ -54,8 +54,8 @@
             android:textOn="DSR" />
 
         <View
-            android:layout_height="match_parent"
-            android:layout_width="6dp" />
+            android:layout_width="6dp"
+            android:layout_height="match_parent" />
 
         <ToggleButton
             android:id="@+id/controlLineCd"
@@ -71,8 +71,8 @@
             android:id="@+id/controlLineRi"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="48sp"
             android:clickable="false"
+            android:minWidth="48sp"
             android:textColor="@android:color/secondary_text_dark"
             android:textOff="RI"
             android:textOn="RI" />
@@ -92,7 +92,9 @@
         android:freezesText="true"
         android:gravity="bottom"
         android:scrollbars="vertical"
-        android:textAppearance="@style/TextAppearance.AppCompat.Medium" />
+        android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+        android:textSize="16sp"
+        android:typeface="monospace" />
 
     <View
         android:layout_width="match_parent"

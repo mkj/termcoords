@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package termcoords;
 
 import android.app.AlertDialog;
 import android.content.Context;

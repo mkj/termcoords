@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#d84315</color>
-    <color name="colorPrimaryDark">#bf360c</color>
-    <color name="colorAccent">#ff6e40</color>
+    <color name="colorPrimary">#0087B4</color>
+    <color name="colorPrimaryDark">#85CEFF</color>
+    <color name="colorAccent">#3C87FF</color>
 
-    <color name="colorRecieveText">#00FF00</color>
-    <color name="colorSendText">#82CAFF</color>
+    <color name="colorRecieveText">#FFB300</color>
+    <color name="colorSendText">#FFBA82</color>
     <color name="colorStatusText">#FFDB58</color>
 </resources>

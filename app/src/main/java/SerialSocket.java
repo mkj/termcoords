@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package termcoords;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;

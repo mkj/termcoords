@@ -24,4 +24,11 @@
         android:id="@+id/sendBreak"
         android:title="Send BREAK"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/logEnabled"
+        android:checkable="true"
+        android:title="Log to File" />
+    <item
+        android:id="@+id/logPath"
+        android:title="Log Path" />
 </menu>

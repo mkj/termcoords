@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package termcoords;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -21,7 +21,7 @@ import java.util.ArrayDeque;
 
 /**
  * create notification and queue serial data while activity is not in the foreground
- * use listener chain: SerialSocket -> SerialService -> UI fragment
+ * use listener chain: termcoords.SerialSocket -> termcoords.SerialService -> UI fragment
  */
 public class SerialService extends Service implements SerialListener {
 
@@ -174,7 +174,7 @@ public class SerialService extends Service implements SerialListener {
     }
 
     /**
-     * SerialListener
+     * termcoords.SerialListener
      */
     public void onSerialConnect() {
         if(connected) {

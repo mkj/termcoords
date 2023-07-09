@@ -1,4 +1,4 @@
-package de.kai_morich.simple_usb_terminal;
+package termcoords;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -12,6 +12,7 @@ import android.content.ServiceConnection;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,6 +23,7 @@ import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.method.ScrollingMovementMethod;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -35,6 +37,7 @@ import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 
 import com.hoho.android.usbserial.driver.SerialTimeoutException;
@@ -42,8 +45,12 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.Date;
 import java.util.EnumSet;
 
 public class TerminalFragment extends Fragment implements ServiceConnection, SerialListener {
@@ -67,6 +74,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean pendingNewline = false;
     private String newline = TextUtil.newline_crlf;
 
+    private boolean logEnabled = false;
+    private Uri logDir;
+    private BufferedOutputStream logFile;
+    private StringBuffer logAccum;
+
+    private static final int PICK_LOG_PATH = 111;
+
     public TerminalFragment() {
         broadcastReceiver = new BroadcastReceiver() {
             @Override
@@ -77,6 +91,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         };
+
+        logAccum = new StringBuffer();
     }
 
     /*
@@ -237,9 +253,123 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("send BREAK failed: " + e.getMessage());
             }
             return true;
+        } else if (id == R.id.logEnabled) {
+            logEnabled = !logEnabled;
+            item.setChecked(logEnabled);
+            if (logEnabled) {
+                if (logDir == null) {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                    startActivityForResult(intent, PICK_LOG_PATH);
+                } else {
+                    rotateLog();
+                }
+            } else {
+                rotateLog();
+            }
+            return true;
+        } else if (id == R.id.logPath) {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            startActivityForResult(intent, PICK_LOG_PATH);
+            return true;
         } else {
             return super.onOptionsItemSelected(item);
         }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode,
+        Intent resultData) {
+        if (requestCode == PICK_LOG_PATH
+            && resultCode == Activity.RESULT_OK) {
+            if (resultData != null) {
+                Uri uri = resultData.getData();
+
+                final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                getActivity().getContentResolver().takePersistableUriPermission(uri, takeFlags);
+                setLogUri(uri);
+            }
+        }
+    }
+
+    /*
+     * Logging
+     */
+    private void setLogUri(Uri uri) {
+        boolean changed = (uri != logDir);
+        logDir = uri;
+        if (changed) {
+            rotateLog();
+        }
+    }
+
+    // Closes current logfile, opens a new one if enabled
+    private void rotateLog() {
+        // close any old log
+        if (logFile != null) {
+            try {
+                logFile.close();
+            } catch (Exception e) {
+                status("Warning: close old log failed");
+            }
+        }
+        logFile = null;
+
+        if (logEnabled && logDir != null) {
+            DocumentFile dd = DocumentFile.fromTreeUri(getActivity(), logDir);
+            String fn = "term-" + new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss").format(new Date());
+            DocumentFile df = dd.createFile("text/csv", fn);
+            try {
+                OutputStream f = getActivity().getContentResolver().openOutputStream(
+                    df.getUri(), "wa");
+                logFile = new BufferedOutputStream(f, 8192);
+            } catch (Exception e) {
+                status("Failed opening " + df + ": " + e);
+            }
+            try {
+                logFile.write("time,lat,long,term\n".getBytes());
+            } catch (Exception e) {
+                // shrug
+            }
+            status("New log " + df);
+        }
+    }
+
+    private String csvEscape(String s) {
+        return s.replace("\"", "\"\"");
+    }
+
+    private void logLine(String line) {
+        String now = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZZ").format(new Date());
+        String lat = "";
+        String lon = "";;
+        String r = String.format("%s,%s,%s,\"%s\"\n", now, lat, lon, csvEscape(line));
+        try {
+            logFile.write(r.getBytes());
+        } catch (Exception e) {
+            // shrug
+        }
+    }
+
+    private void log(String msg) {
+        String[] parts = msg.split("\n");
+        for (int i = 0; i < parts.length - 1; i++) {
+            Log.v("eh", String.valueOf(i) + parts[i]);
+            if (i == 0) {
+                logLine(logAccum.toString());
+                logAccum = new StringBuffer();
+            }
+
+            logLine(parts[i]);
+        }
+
+        if (parts.length > 0) {
+            logAccum.append(parts[parts.length-1]);
+        }
+
     }
 
     /*
@@ -294,7 +424,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             SerialSocket socket = new SerialSocket(getActivity().getApplicationContext(), usbConnection, usbSerialPort);
             service.connect(socket);
             // usb connect is not asynchronous. connect-success and connect-error are returned immediately from socket.connect
-            // for consistency to bluetooth/bluetooth-LE app use same SerialListener and SerialService classes
+            // for consistency to bluetooth/bluetooth-LE app use same termcoords.SerialListener and termcoords.SerialService classes
             onSerialConnect();
         } catch (Exception e) {
             onSerialConnectError(e);
@@ -341,7 +471,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SpannableStringBuilder spn = new SpannableStringBuilder();
         for (byte[] data : datas) {
             if (hexEnabled) {
-                spn.append(TextUtil.toHexString(data)).append('\n');
+                String h = TextUtil.toHexString(data);
+                spn.append(h).append('\n');
             } else {
                 String msg = new String(data);
                 if (newline.equals(TextUtil.newline_crlf) && msg.length() > 0) {
@@ -362,6 +493,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
             }
         }
+        log(spn.toString());
         receiveText.append(spn);
     }
 
@@ -372,7 +504,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     /*
-     * SerialListener
+     * termcoords.SerialListener
      */
     @Override
     public void onSerialConnect() {

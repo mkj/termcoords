@@ -3,19 +3,19 @@ plugins {
 }
 
 android {
-    compileSdkVersion 33
+    compileSdk 34
     defaultConfig {
-        targetSdkVersion 33
-        minSdkVersion 18
+        targetSdk 34
+        minSdk 19
         vectorDrawables.useSupportLibrary true
 
-        applicationId "de.kai_morich.simple_usb_terminal"
+        applicationId 'au.mattj.termcoords'
         versionCode 1
         versionName "1.0"
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     buildTypes {
         release {
@@ -23,7 +23,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    namespace 'de.kai_morich.simple_usb_terminal'
+    namespace 'termcoords'
 }
 
 dependencies {
