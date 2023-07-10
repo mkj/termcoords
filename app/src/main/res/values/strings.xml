@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">Terminal with Coordinates</string>
     <string name="devices">USB Devices</string>
+    <string name="preference_file_key">au.mattj.termcoords.prefs</string>
+    <string name="log_dir">log_dir</string>
 </resources>

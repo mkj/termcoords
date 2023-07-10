@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
@@ -90,6 +91,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private LocationCallback locationCallback;
     private Location currLocation;
+    private Date currLocDate;
 
     private static final int PICK_LOG_PATH = 111;
 
@@ -119,6 +121,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
 
+
+        SharedPreferences sharedPref = getActivity().getSharedPreferences(
+            getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+        String s = sharedPref.getString(getString(R.string.log_dir), null);
+        Log.v("xxx", "logdir is " + s);
+        if (s != null) {
+            logDir = Uri.parse(s);
+        }
+
         requestLocPerms();
 
         locationCallback = new LocationCallback() {
@@ -128,7 +139,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                     return;
                 }
                 currLocation = locationResult.getLastLocation();
-                Log.v("xxx", "loc accuracy " + String.valueOf(currLocation.getAccuracy()));
+                currLocDate = new Date();
             }
         };
 
@@ -357,6 +368,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private void setLogUri(Uri uri) {
         boolean changed = (uri != logDir);
         logDir = uri;
+        SharedPreferences sharedPref = getActivity().getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+        sharedPref.edit().putString(getString(R.string.log_dir), logDir.toString());
         if (changed) {
             rotateLog();
         }
@@ -386,7 +400,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("Failed opening " + df.getName() + ": " + e);
             }
             try {
-                logFile.write("time,lat,long,radius,term\n".getBytes());
+                logFile.write("time,gpstime,lat,long,elev,accuracy,term\n".getBytes());
             } catch (Exception e) {
                 // shrug
             }
@@ -399,21 +413,25 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void logLine(String line) {
-        String now = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZZ").format(new Date());
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
+        String now = fmt.format(new Date());
+        String gpsTime = "";
         String lat = "";
         String lon = "";;
-        String radius = "";;
+        String elev = "";;
+        String acc = "";;
         final int GPS_LIVE_SECS = 20 * 1000;
         if (currLocation != null) {
-            long del = Math.abs(currLocation.getTime() - new Date().getTime());
-            Log.v("xxx", "del " + String.valueOf(del) + " gps " + String.valueOf(currLocation.getTime()));
+            long del = Math.abs(currLocDate.getTime() - new Date().getTime());
             if (del < GPS_LIVE_SECS) {
+                gpsTime = fmt.format(new Date(currLocation.getTime()));
                 lat = String.valueOf(currLocation.getLatitude());
                 lon = String.valueOf(currLocation.getLongitude());
-                radius = String.valueOf(currLocation.getAccuracy());
+                elev = String.format("%.2f", currLocation.getAltitude());
+                acc = String.format("%.1f", currLocation.getAccuracy());
             }
         }
-        String r = String.format("%s,%s,%s,%s,\"%s\"\n", now, lat, lon, radius, csvEscape(line));
+        String r = String.format("%s,%s,%s,%s,%s,%s,\"%s\"\n", now, gpsTime, lat, lon, elev, acc, csvEscape(line));
         try {
             logFile.write(r.getBytes());
         } catch (Exception e) {
@@ -502,6 +520,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         controlLines.stop();
         service.disconnect();
         usbSerialPort = null;
+        if (logFile != null) {
+            try {
+                logFile.flush();
+            } catch (Exception e) {
+                Log.v("xxx", "flush failed " + e);
+            }
+        }
     }
 
     private void send(String str) {
