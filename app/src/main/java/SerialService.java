@@ -7,17 +7,28 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.location.Location;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationRequest;
+
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.Date;
 
 /**
  * create notification and queue serial data while activity is not in the foreground
@@ -53,6 +64,13 @@ public class SerialService extends Service implements SerialListener {
     private SerialListener listener;
     private boolean connected;
 
+    private BufferedOutputStream logFile;
+    private StringBuffer logAccum;
+
+    private LocationCallback locationCallback;
+    private Location currLocation;
+    private Date currLocDate;
+
     /**
      * Lifecylce
      */
@@ -62,6 +80,24 @@ public class SerialService extends Service implements SerialListener {
         queue1 = new ArrayDeque<>();
         queue2 = new ArrayDeque<>();
         lastRead = new QueueItem(QueueType.Read);
+
+        logAccum = new StringBuffer();
+    }
+
+    @Override
+    public void onCreate() {
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                synchronized (this) {
+                    currLocation = locationResult.getLastLocation();
+                    currLocDate = new Date();
+                }
+            }
+        };
     }
 
     @Override
@@ -166,11 +202,112 @@ public class SerialService extends Service implements SerialListener {
         // @drawable/ic_notification created with Android Studio -> New -> Image Asset using @color/colorPrimaryDark as background color
         // Android < API 21 does not support vectorDrawables in notifications, so both drawables used here, are created as .png instead of .xml
         Notification notification = builder.build();
-        startForeground(Constants.NOTIFY_MANAGER_START_FOREGROUND_SERVICE, notification);
+        startForeground(Constants.NOTIFY_MANAGER_START_FOREGROUND_SERVICE, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+
+        final int LOC_MILLIS = 5000;
+        LocationRequest lr = new LocationRequest.Builder(LocationRequest.PRIORITY_HIGH_ACCURACY, LOC_MILLIS)
+                // .setWaitForAccurateLocation(true)
+                .build();
+        // TODO check permission
+        LocationServices.getFusedLocationProviderClient(this).
+                requestLocationUpdates(lr,
+                        locationCallback,
+                        Looper.getMainLooper());
     }
 
     private void cancelNotification() {
+        flushLog();
         stopForeground(true);
+    }
+
+    // logging
+
+    public void setLog(BufferedOutputStream newLog) {
+        synchronized (this) {
+            if (logFile != null) {
+                try {
+                    logFile.close();
+                } catch (Exception e) {
+                    Log.v("xxx", "Warning: close old log failed");
+                }
+            } else {
+                logAccum.setLength(0);
+            }
+
+            logFile = newLog;
+        }
+    }
+
+    public boolean hasLog() {
+        synchronized (this) {
+            return logFile != null;
+        }
+    }
+
+    private void flushLog() {
+        synchronized (this) {
+            if (logFile != null) {
+                try {
+                    logFile.flush();
+                } catch (Exception e) {
+                    Log.v("xxx", "flush failed " + e);
+                }
+            }
+        }
+    }
+
+    private String csvEscape(String s) {
+        return s.replace("\"", "\"\"");
+    }
+
+    private void logLine(String line) {
+        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
+        String now = fmt.format(new Date());
+        String gpsTime = "";
+        String lat = "";
+        String lon = "";;
+        String elev = "";;
+        String acc = "";;
+        final int GPS_LIVE_SECS = 20 * 1000;
+        if (currLocation != null) {
+            long del = Math.abs(currLocDate.getTime() - new Date().getTime());
+            if (del < GPS_LIVE_SECS) {
+                gpsTime = fmt.format(new Date(currLocation.getTime()));
+                lat = String.valueOf(currLocation.getLatitude());
+                lon = String.valueOf(currLocation.getLongitude());
+                elev = String.format("%.2f", currLocation.getAltitude());
+                acc = String.format("%.1f", currLocation.getAccuracy());
+            }
+        }
+        String r = String.format("%s,%s,%s,%s,%s,%s,\"%s\"\n", now, gpsTime, lat, lon, elev, acc, csvEscape(line));
+        try {
+            logFile.write(r.getBytes());
+        } catch (Exception e) {
+            // shrug
+        }
+    }
+
+    private void log(byte[] data) {
+        synchronized (this) {
+            String msg = new String(data);
+            msg = msg.replace("\r", "");
+
+            // keep trailing empty part after any \n
+            String[] parts = msg.split("\n", -1);
+            for (int i = 0; i < parts.length - 1; i++) {
+                if (logAccum.length() > 0) {
+                    logLine(logAccum.toString() + parts[i]);
+                    logAccum.setLength(0);
+                } else {
+                    logLine(parts[i]);
+                }
+            }
+
+            // after the last \n
+            if (!parts[parts.length-1].isEmpty()) {
+                logAccum.append(parts[parts.length-1]);
+            }
+        }
     }
 
     /**
@@ -254,6 +391,8 @@ public class SerialService extends Service implements SerialListener {
                 }
             }
         }
+
+        log(data);
     }
 
     public void onSerialIoError(Exception e) {

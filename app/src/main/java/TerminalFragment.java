@@ -58,6 +58,8 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.BufferedOutputStream;
+import java.nio.Buffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.Date;
@@ -86,12 +88,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private boolean logEnabled = false;
     private Uri logDir;
-    private BufferedOutputStream logFile;
-    private StringBuffer logAccum;
-
-    private LocationCallback locationCallback;
-    private Location currLocation;
-    private Date currLocDate;
 
     private static final int PICK_LOG_PATH = 111;
 
@@ -105,8 +101,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 }
             }
         };
-
-        logAccum = new StringBuffer();
     }
 
     /*
@@ -125,24 +119,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         SharedPreferences sharedPref = getActivity().getSharedPreferences(
             getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         String s = sharedPref.getString(getString(R.string.log_dir), null);
-        Log.v("xxx", "logdir is " + s);
         if (s != null) {
             logDir = Uri.parse(s);
         }
+        logEnabled = sharedPref.getBoolean(getString(R.string.log_enabled), false);
 
         requestLocPerms();
-
-        locationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                if (locationResult == null) {
-                    return;
-                }
-                currLocation = locationResult.getLastLocation();
-                currLocDate = new Date();
-            }
-        };
-
     }
 
     @Override
@@ -156,10 +138,12 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onStart() {
         super.onStart();
-        if(service != null)
+        if(service != null) {
             service.attach(this);
-        else
+            rotateLog();
+        } else {
             getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+        }
     }
 
     @Override
@@ -193,16 +177,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if(controlLinesEnabled && controlLines != null && connected == Connected.True)
             controlLines.start();
 
-        final int LOC_MILLIS = 5000;
-        LocationRequest lr = new LocationRequest.Builder(LocationRequest.PRIORITY_HIGH_ACCURACY, LOC_MILLIS)
-        // .setWaitForAccurateLocation(true)
-        .build();
-        // TODO check permission
-        LocationServices.getFusedLocationProviderClient(getActivity()).
-            requestLocationUpdates(lr,
-                locationCallback,
-                Looper.getMainLooper());
-
     }
 
     @Override
@@ -217,6 +191,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onServiceConnected(ComponentName name, IBinder binder) {
         service = ((SerialService.SerialBinder) binder).getService();
         service.attach(this);
+        rotateLog();
         if(initialStart && isResumed()) {
             initialStart = false;
             getActivity().runOnUiThread(this::connect);
@@ -255,6 +230,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         inflater.inflate(R.menu.menu_terminal, menu);
         menu.findItem(R.id.hex).setChecked(hexEnabled);
         menu.findItem(R.id.controlLines).setChecked(controlLinesEnabled);
+        menu.findItem(R.id.logEnabled).setChecked(logEnabled);
     }
 
     @Override
@@ -314,6 +290,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             } else {
                 rotateLog();
             }
+            
+            SharedPreferences sharedPref = getActivity().getSharedPreferences(
+                    getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+            SharedPreferences.Editor e = sharedPref.edit();
+            e.putBoolean(getString(R.string.log_enabled), logEnabled);
+            e.apply();
+
             return true;
         } else if (id == R.id.logPath) {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -365,96 +348,58 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     /*
      * Logging
      */
+
+    // Should be called with a uri that has permissions.
     private void setLogUri(Uri uri) {
         boolean changed = (uri != logDir);
         logDir = uri;
-        SharedPreferences sharedPref = getActivity().getSharedPreferences(
-                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
-        sharedPref.edit().putString(getString(R.string.log_dir), logDir.toString());
+
         if (changed) {
             rotateLog();
         }
+
+        SharedPreferences sharedPref = getActivity().getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+        SharedPreferences.Editor e = sharedPref.edit();
+        e.putString(getString(R.string.log_dir), logDir.toString());
+        e.apply();
     }
 
     // Closes current logfile, opens a new one if enabled
     private void rotateLog() {
+        if (service == null) {
+            return;
+        }
+
+        if (logEnabled && service.hasLog()) {
+            // Don't rotate if we don't need to when resuming the activity
+            return;
+        }
+
         // close any old log
-        if (logFile != null) {
-            try {
-                logFile.close();
-            } catch (Exception e) {
-                status("Warning: close old log failed");
+        service.setLog(null);
+
+        if (logEnabled) {
+            if (logDir != null) {
+                DocumentFile dd = DocumentFile.fromTreeUri(getActivity(), logDir);
+                String fn = "term-" + new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss").format(new Date());
+                DocumentFile df = dd.createFile("text/csv", fn);
+                try {
+                    OutputStream f = getActivity().getContentResolver().openOutputStream(
+                        df.getUri(), "wa");
+                    BufferedOutputStream logFile = new BufferedOutputStream(f, 8192);
+                    logFile.write("time,gpstime,lat,long,elev,accuracy,term\n".getBytes());
+                    service.setLog(logFile);
+                    status("New log " + dd.getName() + "/" + df.getName());
+                } catch (Exception e) {
+                    status("Creating log failed. " + dd.getName() + "/" + df.getName() + " " + e);
+                }
+            } else {
+                status("No log dir");
             }
+        } else {
+            status("Log stopped");
         }
-        logFile = null;
-
-        if (logEnabled && logDir != null) {
-            DocumentFile dd = DocumentFile.fromTreeUri(getActivity(), logDir);
-            String fn = "term-" + new SimpleDateFormat("yyyy-MM-dd-HH:mm:ss").format(new Date());
-            DocumentFile df = dd.createFile("text/csv", fn);
-            try {
-                OutputStream f = getActivity().getContentResolver().openOutputStream(
-                    df.getUri(), "wa");
-                logFile = new BufferedOutputStream(f, 8192);
-            } catch (Exception e) {
-                status("Failed opening " + df.getName() + ": " + e);
-            }
-            try {
-                logFile.write("time,gpstime,lat,long,elev,accuracy,term\n".getBytes());
-            } catch (Exception e) {
-                // shrug
-            }
-            status("New log " + df.getName());
-        }
-    }
-
-    private String csvEscape(String s) {
-        return s.replace("\"", "\"\"");
-    }
-
-    private void logLine(String line) {
-        SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
-        String now = fmt.format(new Date());
-        String gpsTime = "";
-        String lat = "";
-        String lon = "";;
-        String elev = "";;
-        String acc = "";;
-        final int GPS_LIVE_SECS = 20 * 1000;
-        if (currLocation != null) {
-            long del = Math.abs(currLocDate.getTime() - new Date().getTime());
-            if (del < GPS_LIVE_SECS) {
-                gpsTime = fmt.format(new Date(currLocation.getTime()));
-                lat = String.valueOf(currLocation.getLatitude());
-                lon = String.valueOf(currLocation.getLongitude());
-                elev = String.format("%.2f", currLocation.getAltitude());
-                acc = String.format("%.1f", currLocation.getAccuracy());
-            }
-        }
-        String r = String.format("%s,%s,%s,%s,%s,%s,\"%s\"\n", now, gpsTime, lat, lon, elev, acc, csvEscape(line));
-        try {
-            logFile.write(r.getBytes());
-        } catch (Exception e) {
-            // shrug
-        }
-    }
-
-    private void log(String msg) {
-        // keep trailing empty part after any \n
-        String[] parts = msg.split("\n", -1);
-        for (int i = 0; i < parts.length - 1; i++) {
-            if (i == 0) {
-                logLine(logAccum.toString());
-                logAccum = new StringBuffer();
-            }
-
-            logLine(parts[i]);
-        }
-
-        if (parts.length > 0) {
-            logAccum.append(parts[parts.length-1]);
-        }
-
     }
 
     /*
@@ -521,13 +466,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         controlLines.stop();
         service.disconnect();
         usbSerialPort = null;
-        if (logFile != null) {
-            try {
-                logFile.flush();
-            } catch (Exception e) {
-                Log.v("xxx", "flush failed " + e);
-            }
-        }
     }
 
     private void send(String str) {
@@ -585,7 +523,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 spn.append(TextUtil.toCaretString(msg, newline.length() != 0));
             }
         }
-        log(spn.toString());
         receiveText.append(spn);
     }
 

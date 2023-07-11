@@ -3,4 +3,5 @@
     <string name="devices">USB Devices</string>
     <string name="preference_file_key">au.mattj.termcoords.prefs</string>
     <string name="log_dir">log_dir</string>
+    <string name="log_enabled">log_enabled</string>
 </resources>
