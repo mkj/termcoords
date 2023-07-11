@@ -440,7 +440,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     private void log(String msg) {
-        String[] parts = msg.split("\n");
+        // keep trailing empty part after any \n
+        String[] parts = msg.split("\n", -1);
         for (int i = 0; i < parts.length - 1; i++) {
             if (i == 0) {
                 logLine(logAccum.toString());
